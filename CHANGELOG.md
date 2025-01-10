@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [5.0.0-alpha.1](https://github.com/piscinajs/piscina/compare/v5.0.0-alpha.0...v5.0.0-alpha.1) (2025-01-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **#305:** Expose new `PiscinaHistogram` abstraction (#723)
+
+### Features
+
+* **#305:** Expose new `PiscinaHistogram` abstraction ([#723](https://github.com/piscinajs/piscina/issues/723)) ([86d736c](https://github.com/piscinajs/piscina/commit/86d736cf4c239d20e1a403d11a82b7ead0611aa8)), closes [#305](https://github.com/piscinajs/piscina/issues/305)
+
 ## [5.0.0-alpha.0](https://github.com/piscinajs/piscina/compare/v4.6.1...v5.0.0-alpha.0) (2024-12-04)
 
 
