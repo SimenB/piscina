@@ -17,9 +17,13 @@
 
 Written in TypeScript.
 
-For Node.js 16.x and higher.
+For Node.js 18.x and higher.
 
 [MIT Licensed][].
+
+## Documentation
+
+- [Website](https://piscinajs.github.io/piscina/)
 
 ## Piscina API
 
@@ -260,6 +264,56 @@ module.exports = ({ a, b }) => {
 };
 ```
 
+### Broadcast a message to all worker threads
+
+Piscina supports broadcast communication via BroadcastChannel(Node v18+). Here is an example, the main thread sends a message, and other threads the receive message.
+
+In `main.js`
+```js
+'use strict';
+
+const { BroadcastChannel } = require('worker_threads');
+const { resolve } = require('path');
+
+const Piscina = require('piscina');
+const piscina = new Piscina({
+  filename: resolve(__dirname, 'worker.js'),
+  atomics: 'disabled'
+});
+
+async function main () {
+  const bc = new BroadcastChannel('my_channel');
+  // start worker
+  Promise.all([
+    piscina.run('thread 1'),
+    piscina.run('thread 2')
+  ]);
+  // post message in one second
+  setTimeout(() => {
+    bc.postMessage('Main thread message');
+  }, 1000);
+}
+
+main();
+
+```
+In `worker.js`
+```js
+'use strict';
+const { BroadcastChannel } = require('worker_threads');
+
+module.exports = async (thread) => {
+  const bc = new BroadcastChannel('my_channel');
+  bc.onmessage = (event) => {
+    console.log(thread + ' Received from:' + event.data);
+  };
+  await new Promise((resolve) => {
+    setTimeout(resolve, 2000);
+  });
+};
+
+```
+
 ### Additional Examples
 
 Additional examples can be found in the GitHub repo at
@@ -308,12 +362,16 @@ This class extends [`EventEmitter`][] from Node.js.
     only makes sense to specify if there is some kind of asynchronous component
     to the task. Keep in mind that Worker threads are generally not built for
     handling I/O in parallel.
-  * `useAtomics`: (`boolean`) Use the [`Atomics`][] API for faster communication
+  * `atomics`: (`sync` | `async` | `disabled`) Use the [`Atomics`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics) API for faster communication
     between threads. This is on by default. You can disable `Atomics` globally by
-    setting the environment variable `PISCINA_DISABLE_ATOMICS` to `1`. 
-    If `useAtomics` is `true`, it will cause to pause threads (stoping all execution)
-    between tasks. Ideally, threads should wait for all operations to finish before 
-    returning control to the main thread (avoid having open handles within a thread).
+    setting the environment variable `PISCINA_DISABLE_ATOMICS` to `1` .
+    If `atomics` is `sync`, it will cause to pause threads (stoping all execution)
+    between tasks. Ideally, threads should wait for all operations to finish before
+    returning control to the main thread (avoid having open handles within a thread). If still want to have the possibility
+    of having open handles or handle asynchrnous tasks, you can set the environment variable `PISCINA_ENABLE_ASYNC_ATOMICS` to `1` or setting `options.atomics` to `async`.
+
+   > **Note**: The `async` mode comes with performance penalties and can lead to undesired behaviour if open handles are not tracked correctly.
+  
   * `resourceLimits`: (`object`) See [Node.js new Worker options][]
     * `maxOldGenerationSizeMb`: (`number`) The maximum size of each worker threads
       main heap in MB.
@@ -339,9 +397,9 @@ This class extends [`EventEmitter`][] from Node.js.
     alternative implementation. See [Custom Task Queues][] for additional detail.
   * `niceIncrement`: (`number`) An optional value that decreases priority for
     the individual threads, i.e. the higher the value, the lower the priority
-    of the Worker threads. This value is only used on Linux and requires the
-    optional [`nice-napi`][] module to be installed.
-    See [`nice(2)`][] for more details.
+    of the Worker threads. This value is used on Unix/Windows and requires the
+    optional [`@napi-rs/nice`][https://www.npmjs.com/package/@napi-rs/nice] module to be installed.
+    See [`nice(2)`][https://linux.die.net/man/2/nice] for more details.
   * `trackUnmanagedFds`: (`boolean`) An optional setting that, when `true`, will
     cause Workers to track file descriptors managed using `fs.open()` and
     `fs.close()`, and will close them automatically when the Worker exits.
@@ -369,39 +427,12 @@ Schedules a task to be run on a Worker thread.
     constructor for this task. If no `filename` was specified to the constructor,
     this is mandatory.
   * `name`: Optionally overrides the exported worker function used for the task.
-  * `abortSignal`: An [`AbortSignal`][] instance. If passed, this can be used to
+  * `signal`: An [`AbortSignal`][] instance. If passed, this can be used to
     cancel a task. If the task is already running, the corresponding `Worker`
     thread will be stopped.
     (More generally, any `EventEmitter` or `EventTarget` that emits `'abort'`
     events can be passed here.) Abortable tasks cannot share threads regardless
     of the `concurrentTasksPerWorker` options.
-
-This returns a `Promise` for the return value of the (async) function call
-made to the function exported from `filename`. If the (async) function throws
-an error, the returned `Promise` will be rejected with that error.
-If the task is aborted, the returned `Promise` is rejected with an error
-as well.
-
-### Method: `runTask(task[, transferList][, filename][, abortSignal])`
-
-**Deprecated** -- Use `run(task, options)` instead.
-
-Schedules a task to be run on a Worker thread.
-
-* `task`: Any value. This will be passed to the function that is exported from
-  `filename`.
-* `transferList`: An optional lists of objects that is passed to
-  [`postMessage()`] when posting `task` to the Worker, which are transferred
-  rather than cloned.
-* `filename`: Optionally overrides the `filename` option passed to the
-  constructor for this task. If no `filename` was specified to the constructor,
-  this is mandatory.
-* `abortSignal`: An [`AbortSignal`][] instance. If passed, this can be used to
-  cancel a task. If the task is already running, the corresponding `Worker`
-  thread will be stopped.
-  (More generally, any `EventEmitter` or `EventTarget` that emits `'abort'`
-  events can be passed here.) Abortable tasks cannot share threads regardless
-  of the `concurrentTasksPerWorker` options.
 
 This returns a `Promise` for the return value of the (async) function call
 made to the function exported from `filename`. If the (async) function throws
@@ -439,12 +470,16 @@ An `'error'` event is emitted by instances of this class when:
 - Unexpected messages are sent from from Worker threads.
 
 All other errors are reported by rejecting the `Promise` returned from
-`run()` or `runTask()`, including rejections reported by the handler function
+`run()`, including rejections reported by the handler function
 itself.
 
 ### Event: `'drain'`
 
-A `'drain'` event is emitted whenever the `queueSize` reaches `0`.
+A `'drain'` event is emitted when the current usage of the
+pool is below the maximum capacity of the same.
+The intended goal is to provide backpressure to the task source
+so creating tasks that can not be executed at immediately can be avoided.
+
 
 ### Event: `'needsDrain'`
 
@@ -697,7 +732,7 @@ An example of a custom task queue that uses a shuffled priority queue
 is available in [`examples/task-queue`](./examples/task-queue/index.js);
 
 The special symbol `Piscina.queueOptionsSymbol` may be set as a property
-on tasks submitted to `run()` or `runTask()` as a way of passing additional
+on tasks submitted to `run()` as a way of passing additional
 options on to the custom `TaskQueue` implementation. (Note that because the
 queue options are set as a property on the task, tasks with queue
 options cannot be submitted as JavaScript primitives).
@@ -744,14 +779,13 @@ const piscina = new Piscina({
 
 // Submit tasks to the pool
 for (let i = 0; i < 10; i++) {
-  piscina.runTask({ data: i }).then((result) => {
+  piscina.run({ data: i }).then((result) => {
     console.log(result);
   }).catch((error) => {
     console.error(error);
   });
 }
 ```
-**Note** The `FixedQueue` will become the default task queue implementation in a next major version.
 
 ## Current Limitations (Things we're working on / would love help with)
 
@@ -842,8 +876,8 @@ are no one set of options that are going to work best.
 
 On Linux systems that support [`nice(2)`][], Piscina is capable of setting
 the priority of every worker in the pool. To use this mechanism, an additional
-optional native addon dependency (`nice-napi`, `npm i nice-napi`) is required.
-Once [`nice-napi`][] is installed, creating a `Piscina` instance with the
+optional native addon dependency (`@napi-rs/nice`, `npm i @napi-rs/nice`) is required.
+Once [`@napi-rs/nice`][] is installed, creating a `Piscina` instance with the
 `niceIncrement` configuration option will set the priority for the pool:
 
 ```js
@@ -877,107 +911,14 @@ documentation that threads are being used. It would be ideal if those
 would make it possible for users to provide an existing `Piscina` instance
 as a configuration option in lieu of always creating their own.
 
-
-## Release Notes
-
-### 4.1.0
-
-#### Features
-
-* add `needsDrain` property ([#368](https://github.com/piscinajs/piscina/issues/368)) ([2d49b63](https://github.com/piscinajs/piscina/commit/2d49b63368116c172a52e2019648049b4d280162))
-* correctly handle process.exit calls outside of a task ([#361](https://github.com/piscinajs/piscina/issues/361)) ([8e6d16e](https://github.com/piscinajs/piscina/commit/8e6d16e1dc23f8bb39772ed954f6689852ad435f))
-
-
-#### Bug Fixes
-
-* Fix types for TypeScript 4.7 ([#239](https://github.com/piscinajs/piscina/issues/239)) ([a38fb29](https://github.com/piscinajs/piscina/commit/a38fb292e8fcc45cc20abab8668f82d908a24dc0))
-* use CJS imports ([#374](https://github.com/piscinajs/piscina/issues/374)) ([edf8dc4](https://github.com/piscinajs/piscina/commit/edf8dc4f1a19e9b49e266109cdb70d9acc86f3ca))
-
-### 4.0.0
-
-* Drop Node.js 14.x support
-* Add Node.js 20.x to CI
-
-### 3.2.0
-
-* Adds a new `PISCINA_DISABLE_ATOMICS` environment variable as an alternative way of
-  disabling Piscina's internal use of the `Atomics` API. (https://github.com/piscinajs/piscina/pull/163)
-* Fixes a bug with transferable objects. (https://github.com/piscinajs/piscina/pull/155)
-* Fixes CI issues with TypeScript. (https://github.com/piscinajs/piscina/pull/161)
-
-### 3.1.0
-
-* Deprecates `piscina.runTask()`; adds `piscina.run()` as an alternative.
-  https://github.com/piscinajs/piscina/commit/d7fa24d7515789001f7237ad6ae9ad42d582fc75
-* Allows multiple exported handler functions from a single file.
-  https://github.com/piscinajs/piscina/commit/d7fa24d7515789001f7237ad6ae9ad42d582fc75
-
-### 3.0.0
-
-* Drops Node.js 10.x support
-* Updates minimum TypeScript target to ES2019
-
-### 2.1.0
-
-* Adds name property to indicate `AbortError` when tasks are
-  canceled using an `AbortController` (or similar)
-* More examples
-
-### 2.0.0
-
-* Added unmanaged file descriptor tracking
-* Updated dependencies
-
-### 1.6.1
-
-* Bug fix: Reject if AbortSignal is already aborted
-* Bug Fix: Use once listener for abort event
-
-### 1.6.0
-
-* Add the `niceIncrement` configuration parameter.
-
-### 1.5.1
-
-* Bug fixes around abortable task selection.
-
-### 1.5.0
-
-* Added `Piscina.move()`
-* Added Custom Task Queues
-* Added utilization metric
-* Wait for workers to be ready before considering them as candidates
-* Additional examples
-
-### 1.4.0
-
-* Added `maxQueue = 'auto'` to autocalculate the maximum queue size.
-* Added more examples, including an example of implementing a worker
-  as a Node.js native addon.
-
-### 1.3.0
-
-* Added the `'drain'` event
-
-### 1.2.0
-
-* Added support for ESM and file:// URLs
-* Added `env`, `argv`, `execArgv`, and `workerData` options
-* More examples
-
-### 1.1.0
-
-* Added support for Worker Thread `resourceLimits`
-
-### 1.0.0
-
-* Initial release!
-
 ## The Team
 
 * James M Snell <jasnell@gmail.com>
 * Anna Henningsen <anna@addaleax.net>
 * Matteo Collina <matteo.collina@gmail.com>
+* Rafael Gonzaga <rafael.nunu@hotmail.com>
+* Robert Nagy <ronagy@icloud.com>
+* Carlos Fuentes <me@metcoder.dev>
 
 ## Acknowledgements
 
@@ -988,7 +929,7 @@ Piscina development is sponsored by [NearForm Research][].
 [`postMessage`]: https://nodejs.org/api/worker_threads.html#worker_threads_port_postmessage_value_transferlist
 [`examples/task-queue`]: https://github.com/jasnell/piscina/blob/master/examples/task-queue/index.js
 [`nice(2)`]: https://linux.die.net/man/2/nice
-[`nice-napi`]: https://npmjs.org/package/nice-napi
+[`@napi-rs/nice`]: https://npmjs.org/package/@napi-rs/nice
 [`runTime`]: #property-runtime-readonly
 [Custom Task Queues]: #custom_task_queues
 [ES modules]: https://nodejs.org/api/esm.html

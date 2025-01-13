@@ -74,14 +74,14 @@ test('maxQueue must be non-negative integer', async ({ throws, equal }) => {
   equal(p.options.maxQueue, 4);
 });
 
-test('useAtomics must be a boolean', async ({ throws }) => {
+test('atomics must be valid', async ({ throws }) => {
   throws(() => new Piscina(({
-    useAtomics: -1
-  }) as any), /options.useAtomics must be a boolean/);
+    atomics: -1
+  }) as any), /options.atomics should be a value of sync, sync or disabled./);
 
   throws(() => new Piscina(({
-    useAtomics: 'string'
-  }) as any), /options.useAtomics must be a boolean/);
+    atomics: 'string'
+  }) as any), /options.atomics should be a value of sync, sync or disabled./);
 });
 
 test('resourceLimits must be an object', async ({ throws }) => {
@@ -108,7 +108,9 @@ test('taskQueue must be a TaskQueue object', async ({ throws }) => {
   }) as any), /options.taskQueue must be a TaskQueue object/);
 });
 
-test('niceIncrement must be non-negative integer', async ({ throws }) => {
+test('niceIncrement must be non-negative integer on Unix', {
+  skip: process.platform === 'win32' ? 'Unix options validate' : false
+}, async ({ throws }) => {
   throws(() => new Piscina(({
     niceIncrement: -1
   }) as any), /options.niceIncrement must be a non-negative integer/);

@@ -1,28 +1,32 @@
 {
   "name": "piscina",
-  "version": "4.4.0",
+  "version": "5.0.0-alpha.1",
   "description": "A fast, efficient Node.js Worker Thread Pool implementation",
-  "main": "./dist/src/main.js",
+  "main": "./dist/main.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    "types": "./dist/src/index.d.ts",
+    "types": "./dist/index.d.ts",
     "import": "./dist/esm-wrapper.mjs",
-    "require": "./dist/src/main.js"
+    "require": "./dist/main.js"
   },
-  "types": "./dist/src/index.d.ts",
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
     "build": "tsc && gen-esm-wrapper . dist/esm-wrapper.mjs",
-    "lint": "standardx \"**/*.{ts,mjs,js,cjs}\" | snazzy",
+    "lint": "eslint",
     "test": "c8 tap",
     "test:ci": "npm run lint && npm run build && npm run test:coverage",
     "test:coverage": "c8 --reporter=lcov tap --cov",
     "prepack": "npm run build",
-    "bench": "npm run bench:taskqueue && npm run bench:piscina",
-    "bench:piscina": "npm run benchmark:piscina-default &&npm run benchmark:piscina-fixed-queue && npm run benchmark:piscina-comparison",
-    "bench:taskqueue": "npm run benchmark:queue-comparison",
-    "benchmark:piscina-default": "node benchmark/simple-benchmark.js",
-    "benchmark:piscina-fixed-queue": "node benchmark/simple-benchmark-fixed-queue.js",
-    "benchmark:piscina-comparison": "node benchmark/piscina-queue-comparison.js",
-    "benchmark:queue-comparison": "node benchmark/queue-comparison.js"
+    "benchmark": "npm run bench:queue && npm run benchmark:piscina",
+    "benchmark:piscina": "npm run benchmark:default &&npm run benchmark:queue:fixed && npm run benchmark:default:comparison",
+    "benchmark:default": "node benchmark/simple-benchmark.js",
+    "benchmark:default:async": "node benchmark/simple-benchmark.js",
+    "benchmark:default:comparison": "node benchmark/piscina-queue-comparison.js",
+    "benchmark:queue": "npm run benchmark:queue-comparison",
+    "benchmark:queue:fixed": "node benchmark/simple-benchmark-fixed-queue.js",
+    "benchmark:queue:comparison": "node benchmark/queue-comparison.js"
   },
   "repository": {
     "type": "git",
@@ -37,51 +41,25 @@
   "author": "James M Snell <jasnell@gmail.com>",
   "contributors": [
     "Anna Henningsen <anna@addaleax.net>",
-    "Matteo Collina <matteo.collina@gmail.com>"
+    "Matteo Collina <matteo.collina@gmail.com>",
+    "Carlos Fuentes <me@metcoder.dev>"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.8.0",
-    "@typescript-eslint/eslint-plugin": "^6.9.0",
-    "@typescript-eslint/parser": "^6.9.0",
+    "@types/node": "^22.4.1",
     "abort-controller": "^3.0.0",
-    "c8": "^9.1.0",
+    "c8": "^10.1.2",
     "concat-stream": "^2.0.0",
+    "eslint": "^9.16.0",
     "gen-esm-wrapper": "^1.1.1",
-    "snazzy": "^9.0.0",
-    "standardx": "^7.0.0",
+    "neostandard": "^0.12.0",
     "tap": "^16.3.7",
-    "tinybench": "^2.8.0",
+    "tinybench": "^3.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "5.4.5"
+    "typescript": "5.7.3"
   },
   "optionalDependencies": {
-    "nice-napi": "^1.0.2"
-  },
-  "eslintConfig": {
-    "rules": {
-      "semi": [
-        "error",
-        "always"
-      ],
-      "no-unused-vars": "off",
-      "no-use-before-define": "off",
-      "no-unreachable-loop": "off",
-      "no-dupe-class-members": "off",
-      "@typescript-eslint/no-unused-vars": "error"
-    },
-    "globals": {
-      "SharedArrayBuffer": true,
-      "Atomics": true,
-      "AbortController": true,
-      "MessageChannel": true
-    }
-  },
-  "standardx": {
-    "parser": "@typescript-eslint/parser",
-    "plugins": [
-      "@typescript-eslint/eslint-plugin"
-    ]
+    "@napi-rs/nice": "^1.0.1"
   },
   "bugs": {
     "url": "https://github.com/piscinajs/piscina/issues"

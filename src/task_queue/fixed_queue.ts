@@ -4,7 +4,8 @@
  * Source: https://github.com/nodejs/node/blob/de7b37880f5a541d5f874c1c2362a65a4be76cd0/lib/internal/fixed_queue.js
  */
 import assert from 'node:assert';
-import { TaskQueue, Task } from './common';
+import type { Task } from './common';
+import { TaskQueue } from '.';
 // Currently optimal queue size, tested on V8 6.0 - 6.6. Must be power of two.
 const kSize = 2048;
 const kMask = kSize - 1;
@@ -62,28 +63,25 @@ class FixedCircularBuffer {
   top: number
   list: Array<Task | undefined>
   next: FixedCircularBuffer | null
-  _size: number
 
   constructor () {
     this.bottom = 0;
     this.top = 0;
     this.list = new Array(kSize);
     this.next = null;
-    this._size = 0;
   }
 
   isEmpty () {
-    return this.top === this.bottom && this._size === 0;
+    return this.top === this.bottom;
   }
 
   isFull () {
-    return this.top === this.bottom && this._size === kSize;
+    return ((this.top + 1) & kMask) === this.bottom;
   }
 
   push (data:Task) {
     this.list[this.top] = data;
     this.top = (this.top + 1) & kMask;
-    this._size++;
   }
 
   shift () {
@@ -91,7 +89,6 @@ class FixedCircularBuffer {
     if (nextItem === undefined) { return null; }
     this.list[this.bottom] = undefined;
     this.bottom = (this.bottom + 1) & kMask;
-    this._size--;
     return nextItem;
   }
 
@@ -113,11 +110,10 @@ class FixedCircularBuffer {
       curr = next;
     }
     this.top = (this.top - 1) & kMask;
-    this._size--;
   }
 }
 
-export default class FixedQueue implements TaskQueue {
+export class FixedQueue implements TaskQueue {
   head: FixedCircularBuffer
   tail: FixedCircularBuffer
   _size: number = 0

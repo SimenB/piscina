@@ -3,7 +3,7 @@ import {
   isMovable,
   markMovable,
   isTransferable
-} from '../dist/src/common';
+} from '../dist/common';
 import { test } from 'tap';
 import { types } from 'util';
 import { MessageChannel, MessagePort } from 'worker_threads';
@@ -73,21 +73,6 @@ test('Moving works', async ({ equal, ok }) => {
   const pool = new Piscina({
     filename: resolve(__dirname, 'fixtures/move.ts')
   });
-
-  {
-    const ab = new ArrayBuffer(10);
-    const ret = await pool.runTask(Piscina.move(ab));
-    equal(ab.byteLength, 0); // It was moved
-    ok(types.isAnyArrayBuffer(ret));
-  }
-
-  {
-    // Test with empty transferList
-    const ab = new ArrayBuffer(10);
-    const ret = await pool.runTask(Piscina.move(ab), []);
-    equal(ab.byteLength, 0); // It was moved
-    ok(types.isAnyArrayBuffer(ret));
-  }
 
   {
     // Test with empty transferList
